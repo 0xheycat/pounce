@@ -75,8 +75,8 @@ type ytInfo struct {
 	Ext                string `json:"ext"`
 	Title              string `json:"title"`
 	RequestedDownloads []struct {
-		URL      string            `json:"url"`
-		Ext      string            `json:"ext"`
+		URL         string            `json:"url"`
+		Ext         string            `json:"ext"`
 		HTTPHeaders map[string]string `json:"http_headers"`
 	} `json:"requested_downloads"`
 	HTTPHeaders map[string]string `json:"http_headers"`
