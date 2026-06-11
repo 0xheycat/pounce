@@ -83,19 +83,53 @@ export const api = {
     req<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(s) }),
 };
 
-// subscribe opens the SSE stream and calls onDownload for every update. The
-// token (if any) goes in the query string because EventSource can't set headers.
+// subscribe opens the SSE stream and calls onDownload for every update. It
+// transparently reconnects with capped exponential backoff if the stream drops
+// (engine restart, network blip, laptop sleep) and stops cleanly when the
+// returned disposer is called. The token (if any) goes in the query string
+// because EventSource can't set request headers.
 export function subscribe(onDownload: (d: Download) => void): () => void {
-  const token = getToken();
-  const url = `${BASE}/api/events${token ? `?token=${encodeURIComponent(token)}` : ""}`;
-  const es = new EventSource(url);
-  es.onmessage = (e) => {
-    try {
-      const msg = JSON.parse(e.data);
-      if (msg.type === "download") onDownload(msg.data as Download);
-    } catch {
-      // ignore malformed frames
-    }
+  let es: EventSource | null = null;
+  let retry = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let closed = false;
+
+  const connect = () => {
+    if (closed) return;
+    const token = getToken();
+    const url = `${BASE}/api/events${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+    es = new EventSource(url);
+
+    es.onopen = () => {
+      retry = 0; // healthy stream: reset the backoff
+    };
+
+    es.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === "download") onDownload(msg.data as Download);
+      } catch {
+        // ignore malformed frames
+      }
+    };
+
+    es.onerror = () => {
+      // Reconnect ourselves: after a hard close (engine down, auth change)
+      // EventSource lands in CLOSED state and never retries on its own.
+      if (closed) return;
+      es?.close();
+      es = null;
+      const delay = Math.min(1000 * 2 ** retry, 15000);
+      retry += 1;
+      timer = setTimeout(connect, delay);
+    };
   };
-  return () => es.close();
+
+  connect();
+
+  return () => {
+    closed = true;
+    if (timer) clearTimeout(timer);
+    es?.close();
+  };
 }

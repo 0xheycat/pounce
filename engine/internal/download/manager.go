@@ -52,11 +52,47 @@ func NewManager(st *store.Store, emit func(*model.Download)) *Manager {
 	}
 }
 
-func (m *Manager) notify(d *model.Download) {
-	if m.emit != nil {
-		m.emit(d)
+// snapshot returns a deep copy of d with every atomically-updated counter read
+// safely. Callers must hold m.mu, which guards the status/speed/error fields.
+// Working from the copy lets us marshal and broadcast a download without racing
+// the segment worker goroutines.
+func (m *Manager) snapshot(d *model.Download) *model.Download {
+	cp := &model.Download{
+		ID:          d.ID,
+		URL:         d.URL,
+		Filename:    d.Filename,
+		Dir:         d.Dir,
+		TotalSize:   d.TotalSize,
+		Downloaded:  atomic.LoadInt64(&d.Downloaded),
+		Status:      d.Status,
+		Connections: d.Connections,
+		Resumable:   d.Resumable,
+		SpeedLimit:  d.SpeedLimit,
+		Error:       d.Error,
+		CreatedAt:   d.CreatedAt,
+		UpdatedAt:   d.UpdatedAt,
+		Speed:       d.Speed,
 	}
-	_ = m.store.Save(d)
+	cp.Segments = make([]model.Segment, len(d.Segments))
+	for i := range d.Segments {
+		cp.Segments[i] = model.Segment{
+			Index:      d.Segments[i].Index,
+			Start:      d.Segments[i].Start,
+			End:        d.Segments[i].End,
+			Downloaded: atomic.LoadInt64(&d.Segments[i].Downloaded),
+		}
+	}
+	return cp
+}
+
+func (m *Manager) notify(d *model.Download) {
+	m.mu.Lock()
+	cp := m.snapshot(d)
+	m.mu.Unlock()
+	if m.emit != nil {
+		m.emit(cp)
+	}
+	_ = m.store.Save(cp)
 }
 
 // LoadExisting restores downloads from disk. Anything that was running when the
@@ -67,7 +103,6 @@ func (m *Manager) LoadExisting() error {
 		return err
 	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	for _, d := range ds {
 		if d.Status == model.StatusRunning {
 			d.Status = model.StatusPaused
@@ -75,7 +110,40 @@ func (m *Manager) LoadExisting() error {
 		d.Speed = 0
 		m.entries[d.ID] = &entry{d: d, limiter: ratelimit.New(d.SpeedLimit)}
 	}
+	m.mu.Unlock()
+	m.cleanOrphans()
 	return nil
+}
+
+// cleanOrphans deletes stray ".pdownload" part files that no longer belong to a
+// known download - for example data left behind by a crash, or by a cancel
+// that raced the worker goroutine. Only directories that downloads actually use
+// are scanned, so unrelated files are never touched.
+func (m *Manager) cleanOrphans() {
+	m.mu.Lock()
+	valid := make(map[string]struct{}, len(m.entries))
+	dirs := map[string]struct{}{DefaultDownloadDir(): {}}
+	for _, e := range m.entries {
+		valid[filepath.Join(e.d.Dir, e.d.Filename+".pdownload")] = struct{}{}
+		dirs[e.d.Dir] = struct{}{}
+	}
+	m.mu.Unlock()
+
+	for dir := range dirs {
+		ents, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, ent := range ents {
+			if ent.IsDir() || filepath.Ext(ent.Name()) != ".pdownload" {
+				continue
+			}
+			full := filepath.Join(dir, ent.Name())
+			if _, ok := valid[full]; !ok {
+				_ = os.Remove(full)
+			}
+		}
+	}
 }
 
 // Add probes the URL, creates a download and returns it (queued, not started).
@@ -114,9 +182,10 @@ func (m *Manager) Add(rawurl, dir string, conns int, speedLimit int64) (*model.D
 
 	m.mu.Lock()
 	m.entries[d.ID] = &entry{d: d, limiter: ratelimit.New(speedLimit)}
+	cp := m.snapshot(d)
 	m.mu.Unlock()
 	m.notify(d)
-	return d, nil
+	return cp, nil
 }
 
 // Start begins (or resumes) a download.
@@ -150,14 +219,21 @@ func (m *Manager) Start(id string) error {
 func (m *Manager) Pause(id string) error {
 	m.mu.Lock()
 	e, ok := m.entries[id]
-	m.mu.Unlock()
 	if !ok {
+		m.mu.Unlock()
 		return fmt.Errorf("download %q not found", id)
 	}
 	e.d.Status = model.StatusPaused
-	if e.cancel != nil {
-		e.cancel()
+	e.d.Speed = 0
+	e.d.UpdatedAt = time.Now()
+	cancel := e.cancel
+	d := e.d
+	m.mu.Unlock()
+
+	if cancel != nil {
+		cancel()
 	}
+	m.notify(d)
 	return nil
 }
 
@@ -165,13 +241,17 @@ func (m *Manager) Pause(id string) error {
 func (m *Manager) SetSpeed(id string, limit int64) error {
 	m.mu.Lock()
 	e, ok := m.entries[id]
-	m.mu.Unlock()
 	if !ok {
+		m.mu.Unlock()
 		return fmt.Errorf("download %q not found", id)
 	}
 	e.d.SpeedLimit = limit
-	e.limiter.SetRate(limit)
-	m.notify(e.d)
+	d := e.d
+	lim := e.limiter
+	m.mu.Unlock()
+
+	lim.SetRate(limit)
+	m.notify(d)
 	return nil
 }
 
@@ -204,21 +284,23 @@ func (m *Manager) List() []*model.Download {
 	defer m.mu.Unlock()
 	out := make([]*model.Download, 0, len(m.entries))
 	for _, e := range m.entries {
-		out = append(out, e.d)
+		out = append(out, m.snapshot(e.d))
 	}
 	return out
 }
 
 func (m *Manager) run(ctx context.Context, e *entry, d *model.Download, lim *ratelimit.Limiter) {
+	m.mu.Lock()
 	d.Status = model.StatusRunning
 	d.Error = ""
 	d.UpdatedAt = time.Now()
+	m.mu.Unlock()
 
 	// Non-resumable transfers must always restart from zero.
 	if !d.Resumable {
 		atomic.StoreInt64(&d.Downloaded, 0)
 		for i := range d.Segments {
-			d.Segments[i].Downloaded = 0
+			atomic.StoreInt64(&d.Segments[i].Downloaded, 0)
 		}
 	}
 	m.notify(d)
@@ -244,7 +326,7 @@ func (m *Manager) run(ctx context.Context, e *entry, d *model.Download, lim *rat
 	var firstErr atomic.Value
 	for i := range d.Segments {
 		seg := &d.Segments[i]
-		if seg.End >= 0 && seg.Downloaded >= (seg.End-seg.Start+1) {
+		if seg.End >= 0 && atomic.LoadInt64(&seg.Downloaded) >= (seg.End-seg.Start+1) {
 			continue // segment already finished
 		}
 		wg.Add(1)
@@ -267,10 +349,28 @@ func (m *Manager) run(ctx context.Context, e *entry, d *model.Download, lim *rat
 	m.mu.Unlock()
 
 	if ctx.Err() != nil {
-		if d.Status != model.StatusCanceled {
+		m.mu.Lock()
+		canceled := d.Status == model.StatusCanceled
+		if !canceled {
 			d.Status = model.StatusPaused
 		}
 		d.Speed = 0
+		d.UpdatedAt = time.Now()
+		m.mu.Unlock()
+		if canceled {
+			// The worker owns the part file, so it deletes it last - after the
+			// segment goroutines have stopped - to avoid racing a recreate with
+			// Remove(), which already removed the metadata. Emit the final state so
+			// SSE clients drop the row, but do not re-persist it.
+			_ = os.Remove(partPath)
+			if m.emit != nil {
+				m.mu.Lock()
+				cp := m.snapshot(d)
+				m.mu.Unlock()
+				m.emit(cp)
+			}
+			return
+		}
 		m.notify(d)
 		return
 	}
@@ -283,12 +383,14 @@ func (m *Manager) run(ctx context.Context, e *entry, d *model.Download, lim *rat
 		m.fail(e, d, rerr)
 		return
 	}
-	d.Status = model.StatusCompleted
 	if d.TotalSize > 0 {
 		atomic.StoreInt64(&d.Downloaded, d.TotalSize)
 	}
+	m.mu.Lock()
+	d.Status = model.StatusCompleted
 	d.Speed = 0
 	d.UpdatedAt = time.Now()
+	m.mu.Unlock()
 	m.notify(d)
 }
 
@@ -302,9 +404,11 @@ func (m *Manager) progressLoop(d *model.Download, stop <-chan struct{}) {
 			return
 		case <-t.C:
 			cur := atomic.LoadInt64(&d.Downloaded)
+			m.mu.Lock()
 			d.Speed = (cur - last) * 2 // sampled every 0.5s -> bytes/sec
-			last = cur
 			d.UpdatedAt = time.Now()
+			m.mu.Unlock()
+			last = cur
 			m.notify(d)
 		}
 	}
@@ -313,11 +417,11 @@ func (m *Manager) progressLoop(d *model.Download, stop <-chan struct{}) {
 func (m *Manager) fail(e *entry, d *model.Download, err error) {
 	m.mu.Lock()
 	e.running = false
-	m.mu.Unlock()
 	d.Status = model.StatusError
 	d.Error = err.Error()
 	d.Speed = 0
 	d.UpdatedAt = time.Now()
+	m.mu.Unlock()
 	m.notify(d)
 }
 

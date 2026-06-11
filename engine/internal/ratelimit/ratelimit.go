@@ -24,13 +24,30 @@ func New(rate int64) *Limiter {
 	return l
 }
 
+// minBurst is the smallest bucket capacity. It must be at least as large as the
+// biggest single WaitN request (the download read-chunk size, 32 KiB) so that
+// rates below the chunk size still throttle instead of letting every oversized
+// chunk pass straight through.
+const minBurst = 64 * 1024
+
 // SetRate updates the limit live. 0 disables throttling.
 func (l *Limiter) SetRate(rate int64) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.rate = float64(rate)
-	// Allow a full second of burst so large read chunks are never starved.
+	if rate <= 0 {
+		l.max = 0
+		l.tokens = 0
+		l.last = time.Now()
+		return
+	}
+	// Allow up to a second of burst, but never less than minBurst so a single
+	// read chunk can always accumulate enough tokens to be admitted (and thus
+	// throttled) instead of bypassing the limiter at low rates.
 	l.max = float64(rate)
+	if l.max < minBurst {
+		l.max = minBurst
+	}
 	l.tokens = l.max
 	l.last = time.Now()
 }

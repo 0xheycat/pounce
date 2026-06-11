@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync/atomic"
 
 	"github.com/0xheycat/pounce/internal/model"
 	"github.com/0xheycat/pounce/internal/ratelimit"
@@ -25,7 +26,7 @@ func (m *Manager) downloadSegment(
 	lim *ratelimit.Limiter,
 	onBytes func(int),
 ) error {
-	start := seg.Start + seg.Downloaded
+	start := seg.Start + atomic.LoadInt64(&seg.Downloaded)
 	if seg.End >= 0 && start > seg.End {
 		return nil // already complete
 	}
@@ -70,7 +71,7 @@ func (m *Manager) downloadSegment(
 				return werr
 			}
 			offset += int64(nw)
-			seg.Downloaded += int64(nw)
+			atomic.AddInt64(&seg.Downloaded, int64(nw))
 			onBytes(nw)
 		}
 		if rerr == io.EOF {

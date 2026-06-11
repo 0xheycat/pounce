@@ -85,6 +85,21 @@ export function SettingsPanel() {
                 className="w-full"
               />
             </Field>
+            <Field label="Default speed limit (KB/s, 0 = unlimited)">
+              <input
+                type="number"
+                min={0}
+                value={Math.round(d.defaultSpeedLimit / 1024)}
+                onChange={(e) =>
+                  setDraft({
+                    ...d,
+                    defaultSpeedLimit:
+                      Math.max(0, Number(e.target.value)) * 1024,
+                  })
+                }
+                className={inputClass}
+              />
+            </Field>
             <Field label={`Max concurrent downloads: ${d.maxConcurrent}`}>
               <input
                 type="range"
