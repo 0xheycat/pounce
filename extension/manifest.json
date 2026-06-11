@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Pounce Capture",
+  "version": "0.1.0",
+  "description": "Capture browser downloads and hand them to the Pounce engine for resumable, accelerated downloading.",
+  "permissions": ["downloads", "contextMenus", "storage", "notifications"],
+  "host_permissions": ["http://127.0.0.1:7766/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Pounce Capture",
+    "default_popup": "popup.html"
+  }
+}

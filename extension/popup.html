@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pounce Capture</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        width: 280px;
+        margin: 0;
+        padding: 16px;
+        background: radial-gradient(circle at 30% 0%, #15162a 0%, #070711 70%);
+        color: #e6e6f0;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        color: #b7b7c8;
+        margin: 12px 0 4px;
+      }
+      input[type="text"],
+      input[type="password"] {
+        width: 100%;
+        box-sizing: border-box;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        padding: 8px;
+        color: #fff;
+        font-size: 13px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 4px;
+      }
+      .row span {
+        font-size: 13px;
+      }
+      button {
+        margin-top: 14px;
+        width: 100%;
+        background: #7c5cff;
+        border: none;
+        border-radius: 10px;
+        padding: 9px;
+        color: #fff;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: rgba(255, 255, 255, 0.08);
+        margin-top: 8px;
+      }
+      #status {
+        margin-top: 10px;
+        min-height: 16px;
+        font-size: 12px;
+        color: #22d3ee;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🐾 Pounce Capture</h1>
+
+    <div class="row">
+      <span>Auto-capture downloads</span>
+      <input id="capture" type="checkbox" />
+    </div>
+
+    <label for="engine">Engine URL</label>
+    <input id="engine" type="text" placeholder="http://127.0.0.1:7766" />
+
+    <label for="token">Auth token (optional)</label>
+    <input id="token" type="password" placeholder="leave empty if disabled" />
+
+    <button id="test" class="secondary">Test connection</button>
+    <div id="status"></div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

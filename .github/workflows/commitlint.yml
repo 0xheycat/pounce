@@ -1,0 +1,22 @@
+name: Commit Lint
+
+# Validates that every commit in a PR follows Conventional Commits, so the
+# auto-generated changelog stays clean. Uses GITHUB_BASE_REF (set automatically
+# on pull_request) instead of ${ {} } expressions.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  conventional-commits:
+    name: Conventional Commits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check commit messages
+        run: bash scripts/check-commits.sh

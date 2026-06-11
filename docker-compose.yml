@@ -1,0 +1,16 @@
+services:
+  pounce:
+    build: .
+    image: pounce:local
+    container_name: pounce
+    ports:
+      - "7766:7766"
+    volumes:
+      - pounce-data:/home/pounce/.pounce
+      - ./downloads:/home/pounce/Downloads
+    # Remote access from your phone/other devices? Uncomment and set a token:
+    # command: ["--remote", "--static", "/opt/pounce/web", "--auth-token", "change-me"]
+    restart: unless-stopped
+
+volumes:
+  pounce-data:

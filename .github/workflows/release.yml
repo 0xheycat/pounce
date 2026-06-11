@@ -1,0 +1,86 @@
+name: Release
+
+# Triggered when you push a version tag (e.g. v0.2.0). Cross-compiles the
+# engine for every platform, bundles the built dashboard, generates release
+# notes from Conventional Commits with git-cliff, and publishes a GitHub
+# Release. No ${ {} } expression syntax is used so the file stays simple and
+# the default GITHUB_TOKEN (via permissions below) is enough.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build dashboard
+        working-directory: dashboard
+        run: |
+          npm install
+          npm run build
+
+      - name: Bundle dashboard into the engine static dir
+        run: |
+          mkdir -p engine/web
+          cp -r dashboard/dist/* engine/web/ || true
+
+      - name: Cross-compile engine binaries
+        working-directory: engine
+        run: |
+          set -euo pipefail
+          APP=pounce
+          VERSION="$GITHUB_REF_NAME"
+          mkdir -p ../dist
+          for t in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+            export GOOS="${t%/*}"
+            export GOARCH="${t#*/}"
+            name="$APP-$VERSION-$GOOS-$GOARCH"
+            bin="../dist/$name/$APP"
+            [ "$GOOS" = "windows" ] && bin="$bin.exe"
+            mkdir -p "../dist/$name"
+            echo "building $name"
+            CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$bin" ./cmd/pounce
+            cp ../README.md ../LICENSE "../dist/$name/" 2>/dev/null || true
+            (
+              cd ../dist
+              if [ "$GOOS" = "windows" ]; then
+                zip -r -q "$name.zip" "$name"
+              else
+                tar -czf "$name.tar.gz" "$name"
+              fi
+            )
+          done
+          ls -la ../dist
+
+      - name: Generate release notes
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip all -o RELEASE_NOTES.md
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: false
+          files: |
+            dist/*.tar.gz
+            dist/*.zip

@@ -1,0 +1,10 @@
+**/node_modules
+dashboard/dist
+engine/pounce
+.git
+.github
+*.zip
+.pounce
+downloads
+docs/screenshots/*.png
+docs/screenshots/*.gif

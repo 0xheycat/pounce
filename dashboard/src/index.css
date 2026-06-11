@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  /* Theme defaults (Midnight). Overridden at runtime by themes.ts. */
+  --pounce-bg: #070711;
+  --pounce-card: #11121f;
+  --pounce-accent: #7c5cff;
+  --pounce-glow: #22d3ee;
+  --pounce-core: #a78bfa;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background:
+    radial-gradient(900px 700px at 75% -10%, color-mix(in srgb, var(--pounce-accent) 22%, transparent), transparent 60%),
+    radial-gradient(circle at 30% 0%, color-mix(in srgb, var(--pounce-card) 90%, transparent) 0%, var(--pounce-bg) 60%);
+  color: #e6e6f0;
+  font-family: Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.5s ease;
+}
+
+.glass {
+  background: color-mix(in srgb, var(--pounce-card) 72%, transparent);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
