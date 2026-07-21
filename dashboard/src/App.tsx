@@ -1,6 +1,9 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useStore } from "./store";
-import { OrbitScene } from "./scene/OrbitScene";
+
+const OrbitScene = lazy(() =>
+  import("./scene/OrbitScene").then((module) => ({ default: module.OrbitScene })),
+);
 import { AddBar } from "./components/AddBar";
 import { Stats } from "./components/Stats";
 import { DownloadList } from "./components/DownloadList";
@@ -18,8 +21,10 @@ export default function App() {
   return (
     <div className="relative min-h-screen overflow-x-hidden">
       {/* 3D scene as an immersive background */}
-      <div className="pointer-events-none fixed inset-0 z-0">
-        <OrbitScene />
+      <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_center,rgba(124,92,255,0.08),transparent_55%)]">
+        <Suspense fallback={null}>
+          <OrbitScene />
+        </Suspense>
       </div>
 
       <div className="relative z-10 mx-auto max-w-5xl px-4 py-8">

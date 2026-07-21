@@ -27,11 +27,37 @@ func TestLimitedAllowsWithinBudget(t *testing.T) {
 }
 
 func TestContextCancelInterrupts(t *testing.T) {
-	l := New(100) // max bucket = 100 bytes
-	_ = l.WaitN(context.Background(), 80) // drain most of the bucket
+	l := New(100)
+	l.mu.Lock()
+	l.tokens = 0
+	l.last = time.Now()
+	l.mu.Unlock()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- l.WaitN(ctx, 100)
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-done:
+		if err != context.Canceled {
+			t.Fatalf("expected context.Canceled, got %v", err)
+		}
+	case <-time.After(250 * time.Millisecond):
+		t.Fatal("rate-limit wait did not stop after context cancellation")
+	}
+}
+
+func TestCanceledContextDoesNotConsumeAvailableTokens(t *testing.T) {
+	l := New(1024)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := l.WaitN(ctx, 80); err == nil {
-		t.Fatalf("expected context cancellation to interrupt the wait")
+
+	if err := l.WaitN(ctx, 1); err != context.Canceled {
+		t.Fatalf("expected context.Canceled, got %v", err)
 	}
 }
