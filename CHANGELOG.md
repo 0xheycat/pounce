@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 🛠 Reliability
+- Restored a green Go formatting gate and added the missing Vite client type declaration.
+- Upgraded the dashboard build toolchain to maintained Vite 7 releases with zero known npm vulnerabilities.
+- Switched CI and release builds to deterministic `npm ci` installs.
+- Added an actual verified dashboard screenshot and a public security policy.
+
 ### 🚀 Features
 - Self-hostable download engine with permanent resume and per-segment progress.
 - Multi-connection segmented downloads (HTTP Range), up to 32 streams.

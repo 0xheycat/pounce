@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   engine:
     name: Engine (Go)
@@ -16,11 +19,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.23.x"
+          cache-dependency-path: engine/go.sum
       - name: Verify formatting
         run: test -z "$(gofmt -l .)"
       - name: Vet
         run: go vet ./...
+      - name: Test
+        run: go test ./...
       - name: Build
         run: go build ./...
 
@@ -34,10 +40,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "20.19.0"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
       - name: Install
-        run: npm install
+        run: npm ci
       - name: Type-check
         run: npm run lint
       - name: Build
         run: npm run build
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

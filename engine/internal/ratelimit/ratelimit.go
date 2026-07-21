@@ -55,6 +55,10 @@ func (l *Limiter) SetRate(rate int64) {
 // WaitN blocks until n bytes may be consumed or ctx is done. It returns
 // immediately when the limiter is unlimited.
 func (l *Limiter) WaitN(ctx context.Context, n int) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	l.mu.Lock()
 	if l.rate <= 0 {
 		l.mu.Unlock()
@@ -71,8 +75,9 @@ func (l *Limiter) WaitN(ctx context.Context, n int) error {
 			l.tokens = l.max
 		}
 		// If a single chunk is larger than the bucket, allow it through to
-		// avoid a permanent stall.
-		if float64(n) >= l.max || l.tokens >= float64(n) {
+		// avoid a permanent stall. A chunk exactly equal to the bucket still
+		// waits for the full budget instead of driving the token count negative.
+		if float64(n) > l.max || l.tokens >= float64(n) {
 			l.tokens -= float64(n)
 			l.mu.Unlock()
 			return nil

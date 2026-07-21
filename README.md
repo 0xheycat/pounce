@@ -8,27 +8,26 @@
 
 A **download engine you host and fully own** — permanent **resume**, **multi-connection acceleration**, live **speed control**, an immersive **3D dashboard**, and optional **browser capture**. Run it on your laptop, home server, or NAS and drive it from any browser. 100% open source (MIT).
 
-![status](https://img.shields.io/badge/status-alpha-7c5cff)
-![engine](https://img.shields.io/badge/engine-Go%20(stdlib)-00ADD8)
-![dashboard](https://img.shields.io/badge/dashboard-React%20%2B%20R3F-22d3ee)
-![license](https://img.shields.io/badge/license-MIT-green)
+[![CI](https://github.com/0xheycat/pounce/actions/workflows/ci.yml/badge.svg)](https://github.com/0xheycat/pounce/actions/workflows/ci.yml)
+[![status](https://img.shields.io/badge/status-alpha-7c5cff)](CHANGELOG.md)
+[![engine](https://img.shields.io/badge/engine-Go%20(stdlib)-00ADD8)](engine/)
+[![dashboard](https://img.shields.io/badge/dashboard-React%20%2B%20R3F-22d3ee)](dashboard/)
+[![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![project](https://img.shields.io/badge/project-0xheycat.xyz-f5b45a)](https://0xheycat.xyz/work/pounce)
 
 </div>
 
 ---
 
-## 📸 Demo
-
-> A short screen recording and screenshots go here. Capture them into [`docs/screenshots/`](docs/screenshots/) (named `dashboard.png`, `add.png`, `themes.png`, `demo.gif`) — that folder's README has a one-command `ffmpeg` recipe. Until then, the banner above represents the project.
+## 📸 Dashboard
 
 <div align="center">
 
-<!-- Once recorded, drop your capture here: -->
-<!-- ![Pounce dashboard](docs/screenshots/dashboard.png) -->
-
-_Placeholder: add `docs/screenshots/dashboard.png` and `demo.gif` to show the full-3D dashboard — orbiting progress orbs, throughput-reactive glow, switchable themes, glassmorphism UI._
+![Pounce dashboard showing the URL composer, device pairing, settings, live counters, and 3D download scene](docs/screenshots/dashboard.png)
 
 </div>
+
+The screenshot is captured from the actual Vite dashboard at the repository's verified public-readiness head. The dashboard works without a paid service; API and live-download data come from the self-hosted Go engine.
 
 ## Why Pounce?
 
