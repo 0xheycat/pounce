@@ -8,7 +8,7 @@
 
 A **download engine you host and fully own** — permanent **resume**, **multi-connection acceleration**, live **speed control**, an immersive **3D dashboard**, and optional **browser capture**. Run it on your laptop, home server, or NAS and drive it from any browser. 100% open source (MIT).
 
-[![CI](https://github.com/0xheycat/pounce/actions/workflows/ci.yml/badge.svg)](https://github.com/0xheycat/pounce/actions/workflows/ci.yml)
+[![Verified](https://img.shields.io/badge/verified-self--hosted-7c5cff)](VERIFICATION.md)
 [![status](https://img.shields.io/badge/status-alpha-7c5cff)](CHANGELOG.md)
 [![engine](https://img.shields.io/badge/engine-Go%20(stdlib)-00ADD8)](engine/)
 [![dashboard](https://img.shields.io/badge/dashboard-React%20%2B%20R3F-22d3ee)](dashboard/)
